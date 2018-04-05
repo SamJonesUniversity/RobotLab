@@ -6,6 +6,7 @@
 
 //Set up the serial input/output
 SoftwareSerial bluetooth(8,9);
+
 //Set the magentometer ready for use
 MPU6050 mpu;
 
@@ -35,6 +36,7 @@ float counterR = 0;
 int encoderLstate = 0;
 int encoderRstate = 0;
 char c = ' ';
+bool stopped = false;
 
 //Function for working out rotations per second
 int counted = 0;
@@ -70,13 +72,12 @@ void setup() {
   mpu.calibrateGyro();
 }
 
-
 void loop() {
   // put your main code here, to run repeatedly:
   if(stopped)
   {
     //Ping front sensor
-    int distanceF = ping();
+    int distanceF = pingF();
     
     ////    Serial    ////
     //Print distance moved since last check
@@ -114,6 +115,7 @@ void loop() {
     //Used to calculate the number of rotations of the wheel
     encoderLstate = digitalRead(encoderInL);
     encoderRstate = digitalRead(encoderInR);
+    
     if(encoderLstate == HIGH && counted == 0)
     {
       HolesPerSecL();
@@ -130,10 +132,12 @@ void loop() {
     {
       countedR = 0;
     }
-
-    if(distance <= 50)
+   
+    int distanceF = pingF();
+    if(distanceF <= 50)
     {
-      right();
+      return;
+      stopped = true;
     }
     else
     {
@@ -165,12 +169,12 @@ void loop() {
       counterR = 0;
     }
 
-      delay((increasetime*1000) - (millis() - currenttime));
+    delay((increasetime*1000) - (millis() - currenttime));
   }
 }
 
 //Front sensor
-public int ping()
+public int pingF()
 {
   digitalWrite(trigPin, LOW);
   
@@ -232,6 +236,3 @@ void backward()
   digitalWrite(rightF, LOW);
   digitalWrite(rightB, HIGH);
 }
-
-
-
