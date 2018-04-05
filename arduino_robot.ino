@@ -35,8 +35,12 @@ float counterL = 0;
 float counterR = 0;
 int encoderLstate = 0;
 int encoderRstate = 0;
-char c = ' ';
+const float circumference = 20.263;
 bool stopped = false;
+float rotationsLps;
+float rotationsRps;
+int meanDist;
+bool turning = false;
 
 //Function for working out rotations per second
 int counted = 0;
@@ -82,36 +86,131 @@ void loop() {
     ////    Serial    ////
     //Print distance moved since last check
     Serial.print("Distance moved from last stop: ");
-    Serial.println();
+    Serial.println(meanDist);
     
     //Print rotation
+    if(yaw <=0)
+    {
+      yaw = 10.5 + yaw;
+    }
+    else
+    {
+      yaw = yaw - 10.5;
+    }
+    
+    int roundedYaw = round(yaw);
     Serial.print("Current rotation: ");
     Serial.println(roundedYaw);
 
     //Print distance from front sensor
     Serial.print("Distance from front sensor: ");
-    Serial.println(distance);
+    Serial.println(distanceF);
     
     ////   Bluetooth   ////
     //Print distance moved since last check
-    bluetooth.print("Distance moved from last stop: ")
+    //bluetooth.print("Distance moved from last stop: ");
     bluetooth.println(meanDist);
-    bluetooth.print("\n");
+    //bluetooth.print("\n");
       
     //Print rotation
-    int roundedYaw = round(yaw);
-    bluetooth.print("Current rotation: ");
+    //bluetooth.print("Current rotation: ");
     bluetooth.println(roundedYaw);
-    bluetooth.print("\n");
+    //bluetooth.print("\n");
     
     //Print distance from front sensor
-    bluetooth.print("Distance from front sensor: ");
-    bluetooth.println(distance);
-    bluetooth.print("\n");
-    
+    //bluetooth.print("Distance from front sensor: ");
+    bluetooth.println(distanceF);
+    //bluetooth.print("\n");
+
+    stopped = false;
   }
   else
-  {
+  {   
+    if(!turning)
+    {
+      int distanceF = pingF();
+
+      //Get a time to return a value every second
+      currenttime = millis();
+      timer = currenttime;
+
+      //unsigned long thistime = currenttime - timer;
+      while(currenttime - timer < 500)
+      {
+        forward();
+        RPS();
+        currenttime = millis();
+      }
+
+      float rotationsLps = counterL/20;
+      float rotationsRps = counterR/20;
+
+      float disL = distL(rotationsLps);
+      float disR = distR(rotationsRps);
+
+      meanDist = round((disL + disR) / 2);
+
+      counterL = 0;
+      counterR = 0;
+      
+      Serial.println("Turning right");
+      
+      right();
+      
+      Serial.println("Turning left");
+      
+      left();
+
+      Serial.println("Stopping");
+
+      stopped = true;
+    }
+    else
+    {
+      
+    }
+
+    //delay((increasetime*1000) - (millis() - currenttime));
+  }
+}
+
+      /*if(distanceF <= 10)
+      {
+        //Read normalised values
+        Vector normalisedvalues = mpu.readNormalizeGyro();
+      
+        //Calculate yaw
+        yaw = yaw + normalisedvalues.XAxis * increasetime;
+        
+        stopped = true;
+      }
+      //else
+      //{
+        //forward();
+      //}*/
+
+//Front sensor
+int pingF()
+{
+  digitalWrite(trigPinF, LOW);
+  
+  delayMicroseconds(2);
+  // Sets the trigPin on HIGH state for 10 micro seconds
+  digitalWrite(trigPinF, HIGH);
+  
+  delayMicroseconds(10);
+  
+  digitalWrite(trigPinF, LOW);
+  // Reads the echoPin, returns the sound wave travel time in microseconds
+  long duration = pulseIn(echoPinF, HIGH);
+  
+  // Calculating the distance
+  int distance = duration*0.034/2;
+  return distance;
+}
+
+void RPS()
+{
     //Used to calculate the number of rotations of the wheel
     encoderLstate = digitalRead(encoderInL);
     encoderRstate = digitalRead(encoderInR);
@@ -132,64 +231,20 @@ void loop() {
     {
       countedR = 0;
     }
-   
-    int distanceF = pingF();
-    if(distanceF <= 50)
-    {
-      return;
-      stopped = true;
-    }
-    else
-    {
-      forward();
-    }
-       
-    //Get a time to return a value every second
-    currenttime = millis();
-    //unsigned long thistime = currenttime - timer;
-
-    //Read normalised values
-    Vector normalisedvalues = mpu.readNormalizeGyro();
-    
-    //Calculate yaw
-    yaw = yaw + normalisedvalues.XAxis * increasetime;
-
-    if((currenttime - timer) >= 1000)
-    {
-      timer = currenttime;
-      
-      Serial.print("RotationsL per second: ");
-      float rotationsLps = counterL/20;
-      float rotationsRps = counterR/20;
-      Serial.println(rotationsLps);
-      Serial.print("RotationsR per second: ");
-      Serial.println(rotationsRps);
-      
-      counterL = 0;
-      counterR = 0;
-    }
-
-    delay((increasetime*1000) - (millis() - currenttime));
-  }
 }
 
-//Front sensor
-public int pingF()
+float distL(float rotationsLps)
 {
-  digitalWrite(trigPin, LOW);
+  float distanceL = (circumference*rotationsLps);
+
+  return distanceL;
+}
+
+float distR(float rotationsRps)
+{
+  float distanceR = (circumference*rotationsRps);
   
-  delayMicroseconds(2);
-  // Sets the trigPin on HIGH state for 10 micro seconds
-  digitalWrite(trigPin, HIGH);
-  
-  delayMicroseconds(10);
-  
-  digitalWrite(trigPin, LOW);
-  // Reads the echoPin, returns the sound wave travel time in microseconds
-  long duration = pulseIn(echoPin, HIGH);
-  
-  // Calculating the distance
-  return int distance = duration*0.034/2;
+  return distanceR;
 }
 
 //Functions to increment the steps counted with each motor turn
@@ -207,25 +262,63 @@ void HolesPerSecR()
 //Functions for movement of the robot
 void forward()
 {
-  digitalWrite(leftF, HIGH);
-  digitalWrite(leftB, LOW);
-  digitalWrite(rightF, HIGH);
-  digitalWrite(rightB, LOW);
+  int ctime = millis();
+  int timeF = ctime;
+  
+  while(ctime - timeF < 50)
+    {
+      digitalWrite(leftF, HIGH);
+      digitalWrite(rightF, HIGH);
+    
+      RPS();
+    
+      ctime = millis();
+    }
+  //delay(50);
+  
+  ctime = millis();
+  timeF = ctime;
+  
+  while(ctime - timeF < 50)
+    {
+      digitalWrite(leftF, LOW);
+      digitalWrite(rightF, LOW);
+    
+      ctime = millis();
+    }
+
+  //delay(50);
+
+  Serial.println("Forward");
 }
 
 void left()
 {
-  digitalWrite(leftF, HIGH);
+  int ctime = millis();
+  int timeF = ctime;
+  
+  while(ctime - timeF < 500)
+  {
+    digitalWrite(leftB, HIGH);
+
+    ctime = millis();
+  }
+  
   digitalWrite(leftB, LOW);
-  digitalWrite(rightF, LOW);
-  digitalWrite(rightB, HIGH);
 }
 
 void right()
 {
-  digitalWrite(leftF, LOW);
-  digitalWrite(leftB, HIGH);
-  digitalWrite(rightF, HIGH);
+  int ctime = millis();
+  int timeF = ctime;
+  
+  while(ctime - timeF < 500)
+  {
+    digitalWrite(rightB, HIGH);
+
+    ctime = millis();
+  }
+
   digitalWrite(rightB, LOW);
 }
 
