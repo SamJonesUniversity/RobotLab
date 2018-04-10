@@ -48,17 +48,17 @@ int countedR = 0;
 
 void setup() {
   // put your setup code here, to run once:
-  Serial.begin(115200); //Begin the serial monitor at 9600
-  bluetooth.begin(115200); //Begin the bluetooth serial at 9600
+  Serial.begin(115200); //Begin the serial monitor at 115200
+  bluetooth.begin(115200); //Begin the bluetooth serial at 115200
   
   pinMode(trigPinF, OUTPUT); // Sets the trigPin as an Output
   pinMode(echoPinF, INPUT); // Sets the echoPin as an Input  
   pinMode(trigPinL, OUTPUT);
-  pinMode(echoPinL, OUTPUT);
+  pinMode(echoPinL, INPUT);
   pinMode(trigPinR, OUTPUT);
-  pinMode(echoPinR, OUTPUT);
+  pinMode(echoPinR, INPUT);
   pinMode(trigPinB, OUTPUT);
-  pinMode(echoPinB, OUTPUT);
+  pinMode(echoPinB, INPUT);
   pinMode(leftF, OUTPUT); //Set pins for motors as an output
   pinMode(leftB, OUTPUT);
   pinMode(rightF, OUTPUT);
@@ -74,6 +74,8 @@ void setup() {
   }
   //Get the initial direction the robot is facing
   mpu.calibrateGyro();
+
+  whatWay();
 }
 
 void loop() {
@@ -139,6 +141,17 @@ void loop() {
       {
         forward();
         RPS();
+        
+        int distFromObj = pingF();
+        if(distFromObj <= 20)
+        {
+          float yawNow = yaw;
+          while(yaw >= yawNow - 90)
+          {
+            right();
+          }
+        }
+        
         currenttime = millis();
       }
 
@@ -153,7 +166,7 @@ void loop() {
       counterL = 0;
       counterR = 0;
       
-      Serial.println("Turning right");
+      /*Serial.println("Turning right");
       
       right();
       
@@ -161,7 +174,7 @@ void loop() {
       
       left();
 
-      Serial.println("Stopping");
+      Serial.println("Stopping");*/
 
       stopped = true;
     }
@@ -205,6 +218,54 @@ int pingF()
   long duration = pulseIn(echoPinF, HIGH);
   
   // Calculating the distance
+  int distance = duration*0.034/2;
+  return distance;
+}
+
+int pingL()
+{
+  digitalWrite(trigPinL, LOW);
+
+  delayMicroseconds(2);
+  digitalWrite(trigPinL, HIGH);
+
+  delayMicroseconds(10);
+
+  digitalWrite(trigPinL, LOW);
+  long duration = pulseIn(echoPinL, HIGH);
+
+  int distance = duration*0.034/2;
+  return distance;
+}
+
+int pingR()
+{
+  digitalWrite(trigPinR, LOW);
+
+  delayMicroseconds(2);
+  digitalWrite(trigPinR, HIGH);
+
+  delayMicroseconds(10);
+
+  digitalWrite(trigPinR, LOW);
+  long duration = pulseIn(echoPinR, HIGH);
+
+  int distance = duration*0.034/2;
+  return distance;
+}
+
+int pingB()
+{
+  digitalWrite(trigPinB, LOW);
+
+  delayMicroseconds(2);
+  digitalWrite(trigPinB, HIGH);
+
+  delayMicroseconds(10);
+
+  digitalWrite(trigPinB, LOW);
+  long duration = pulseIn(echoPinB, HIGH);
+
   int distance = duration*0.034/2;
   return distance;
 }
@@ -259,32 +320,164 @@ void HolesPerSecR()
   countedR = 1;
 }  
 
+int whatWay()
+{
+  int whatOne = 1;
+  int distF = pingF();
+  int closest = distF;
+  int distB = pingB();
+  Serial.println(closest);
+  Serial.println(whatOne);
+
+  if (distB < closest)
+  {
+    closest = distB;
+    whatOne = 2;
+  }
+  Serial.println(closest);
+  Serial.println(whatOne);
+  
+  int distL = pingL();
+
+  if (distL < closest)
+  {
+    closest = distL;
+    whatOne = 3;
+  }
+  Serial.println(closest);
+  Serial.println(whatOne);
+  
+  int distR = pingR();
+
+  if (distR < closest)
+  {
+    closest = distR;
+    whatOne = 4;
+  }
+
+  Serial.println(closest);
+  Serial.println(whatOne);
+
+  bool needMove = false;
+  
+  if(closest > 20)
+  {
+    //move toward closest
+    needMove = true;
+  }
+  
+  switch(whatOne)
+  {
+    case 1:
+    if(needMove)
+    {
+      while(closest >= 20)
+      {
+        forward();
+        closest = pingF();
+      }
+      while(yaw >= -90)
+      {
+        right();
+        Serial.println(yaw);
+      }
+    }
+    
+    break;
+    
+    case 2:
+    if(needMove)
+    {
+      while(closest >= 20)
+      {
+        backward();
+        closest = pingB();
+      }
+      while(yaw >= -90)
+      {
+        right();
+        Serial.println(yaw);
+      }
+    }
+    
+    break;
+    
+    case 3:    
+    if(needMove)
+    {
+      while(yaw <= 90)
+      {
+        left();
+        Serial.println(yaw);
+      }
+      int getDistance = pingF();
+      while(getDistance >= 20)
+      {
+        forward();
+        getDistance = pingF();
+      }
+      while(yaw >= -90)
+      {
+        right();
+        Serial.println(yaw);
+      }
+    }
+    
+    break;
+    
+    case 4:   
+    if(needMove)
+    {
+      Serial.println("Outside loop ran");
+      while(yaw >= -90)
+      {
+        Serial.println("Inside loop ran");
+        right();
+        Serial.println(yaw);
+      }
+      int getDistance = pingF();
+      while(getDistance >= 20)
+      {
+        forward();
+        getDistance = pingF();
+      }
+      while(yaw >= -90)
+      {
+        right();
+        Serial.println(yaw);
+      }
+    }
+    
+    break;
+  } 
+} 
+
 //Functions for movement of the robot
 void forward()
 {
-  int ctime = millis();
-  int timeF = ctime;
+  int cutime = millis();
+  int timeF = cutime;
   
-  while(ctime - timeF < 50)
+  while(cutime - timeF < 50)
     {
       digitalWrite(leftF, HIGH);
       digitalWrite(rightF, HIGH);
     
       RPS();
     
-      ctime = millis();
+      cutime = millis();
     }
   //delay(50);
   
-  ctime = millis();
-  timeF = ctime;
+  cutime = millis();
+  timeF = cutime;
   
-  while(ctime - timeF < 50)
+  while(cutime - timeF < 50)
     {
       digitalWrite(leftF, LOW);
       digitalWrite(rightF, LOW);
     
-      ctime = millis();
+      cutime = millis();
     }
 
   //delay(50);
@@ -292,31 +485,45 @@ void forward()
   Serial.println("Forward");
 }
 
-void left()
+void right()
 {
-  int ctime = millis();
-  int timeF = ctime;
+  int cutime = millis();
+  int timeF = cutime;
   
-  while(ctime - timeF < 500)
+  while(cutime - timeF < 500)
   {
+    cutime = millis();
+    
     digitalWrite(leftB, HIGH);
 
-    ctime = millis();
+    Vector normalisedvalues = mpu.readNormalizeGyro();
+      
+    //Calculate yaw
+    yaw = yaw + normalisedvalues.XAxis * increasetime;
+
+    delay((increasetime*1000) - (millis() - cutime));
   }
   
   digitalWrite(leftB, LOW);
 }
 
-void right()
+void left()
 {
-  int ctime = millis();
-  int timeF = ctime;
+  int cutime = millis();
+  int timeF = cutime;
   
-  while(ctime - timeF < 500)
+  while(cutime - timeF < 500)
   {
+    cutime = millis();
+    
     digitalWrite(rightB, HIGH);
 
-    ctime = millis();
+    Vector normalisedvalues = mpu.readNormalizeGyro();
+      
+    //Calculate yaw
+    yaw = yaw + normalisedvalues.XAxis * increasetime;
+
+    delay((increasetime*1000) - (millis() - cutime));
   }
 
   digitalWrite(rightB, LOW);
