@@ -5,14 +5,14 @@
 #include <Stepper.h>
 
 //Set up the serial input/output
-SoftwareSerial bluetooth(8,9);
+SoftwareSerial bluetooth(8,7);
 
 //Set the magentometer ready for use
 MPU6050 mpu;
 
 //Pins for connected sensors
-const int trigPinF = 12;
-const int echoPinF = 13;
+const int trigPinF = 13;
+const int echoPinF = 12;
 const int trigPinL = 10;
 const int echoPinL = 11;
 const int trigPinR = A2;
@@ -20,11 +20,11 @@ const int echoPinR = A3;
 const int trigPinB = A1;
 const int echoPinB = A0;
 const int encoderInL = 2;
-const int encoderInR = 3;
-const int leftF = 4;
+const int encoderInR = 4;
+const int leftF = 3;
 const int leftB = 5;
 const int rightF = 6;
-const int rightB = 7;
+const int rightB = 9;
 
 //Variables required for calculations
 unsigned long timer = 0;
@@ -84,6 +84,9 @@ void loop() {
   {
     //Ping front sensor
     int distanceF = pingF();
+    int distanceR = pingR();
+    int distanceB = pingB();
+    int distanceL = pingL();
     
     ////    Serial    ////
     //Print distance moved since last check
@@ -107,6 +110,12 @@ void loop() {
     //Print distance from front sensor
     Serial.print("Distance from front sensor: ");
     Serial.println(distanceF);
+    Serial.print("Distance from front sensor: ");
+    Serial.println(distanceR);
+    Serial.print("Distance from front sensor: ");
+    Serial.println(distanceB);
+    Serial.print("Distance from front sensor: ");
+    Serial.println(distanceL);
     
     ////   Bluetooth   ////
     //Print distance moved since last check
@@ -122,66 +131,71 @@ void loop() {
     //Print distance from front sensor
     //bluetooth.print("Distance from front sensor: ");
     bluetooth.println(distanceF);
+    bluetooth.println(distanceR);
+    bluetooth.println(distanceB);
+    bluetooth.println(distanceL);
     //bluetooth.print("\n");
 
     stopped = false;
   }
   else
   {   
-    if(!turning)
+    int distanceF = pingF();
+  
+    //Get a time to return a value every second
+    currenttime = millis();
+    timer = currenttime;
+  
+    //unsigned long thistime = currenttime - timer;
+    while(currenttime - timer < 500)
     {
-      int distanceF = pingF();
-
-      //Get a time to return a value every second
-      currenttime = millis();
-      timer = currenttime;
-
-      //unsigned long thistime = currenttime - timer;
-      while(currenttime - timer < 500)
+      forward();
+      RPS();
+      
+      int distFromObj = pingF();
+      Serial.print("Distance from front ");
+      Serial.println(distFromObj);
+      if(distFromObj <= 20)
       {
-        forward();
-        RPS();
-        
-        int distFromObj = pingF();
-        if(distFromObj <= 20)
+        float yawNow = yaw;
+        while(yaw >= yawNow - 90)
         {
-          float yawNow = yaw;
-          while(yaw >= yawNow - 90)
-          {
-            right();
-          }
+          Serial.println(yawNow);
+          Serial.println(yaw);
+          right();
+          //while(yaw <= yawNow - 95)
+          //{
+            //left();
+          //}
         }
-        
-        currenttime = millis();
       }
-
-      float rotationsLps = counterL/20;
-      float rotationsRps = counterR/20;
-
-      float disL = distL(rotationsLps);
-      float disR = distR(rotationsRps);
-
-      meanDist = round((disL + disR) / 2);
-
-      counterL = 0;
-      counterR = 0;
       
-      /*Serial.println("Turning right");
-      
-      right();
-      
-      Serial.println("Turning left");
-      
-      left();
-
-      Serial.println("Stopping");*/
-
-      stopped = true;
+      currenttime = millis();
     }
-    else
-    {
-      
-    }
+
+    Serial.println("hello");
+    float rotationsLps = counterL/20;
+    float rotationsRps = counterR/20;
+  
+    float disL = distL(rotationsLps);
+    float disR = distR(rotationsRps);
+  
+    meanDist = round((disL + disR) / 2);
+  
+    counterL = 0;
+    counterR = 0;
+    
+    /*Serial.println("Turning right");
+    
+    right();
+    
+    Serial.println("Turning left");
+    
+    left();
+  
+    Serial.println("Stopping");*/
+  
+    stopped = true;
 
     //delay((increasetime*1000) - (millis() - currenttime));
   }
@@ -455,84 +469,66 @@ int whatWay()
 //Functions for movement of the robot
 void forward()
 {
-  int cutime = millis();
-  int timeF = cutime;
+  analogWrite(leftB,  0);
+  analogWrite(rightB, 0);
   
-  while(cutime - timeF < 50)
-    {
-      digitalWrite(leftF, HIGH);
-      digitalWrite(rightF, HIGH);
-    
-      RPS();
-    
-      cutime = millis();
-    }
-  //delay(50);
-  
-  cutime = millis();
-  timeF = cutime;
-  
-  while(cutime - timeF < 50)
-    {
-      digitalWrite(leftF, LOW);
-      digitalWrite(rightF, LOW);
-    
-      cutime = millis();
-    }
+  analogWrite(leftF,  117);
+  analogWrite(rightF, 125);
 
-  //delay(50);
+  RPS();
 
+  //analogWrite(leftF,  0);
+  //analogWrite(rightF, 0);
+  
   Serial.println("Forward");
 }
 
 void right()
 {
   int cutime = millis();
-  int timeF = cutime;
-  
-  while(cutime - timeF < 500)
-  {
-    cutime = millis();
+  analogWrite(rightB, 0);
     
-    digitalWrite(leftB, HIGH);
+  analogWrite(leftB, 125);
 
-    Vector normalisedvalues = mpu.readNormalizeGyro();
-      
-    //Calculate yaw
-    yaw = yaw + normalisedvalues.XAxis * increasetime;
+  Vector normalisedvalues = mpu.readNormalizeGyro();
+    
+  //Calculate yaw
+  yaw = yaw + normalisedvalues.XAxis * increasetime;
 
-    delay((increasetime*1000) - (millis() - cutime));
-  }
+  delay((increasetime*1000) - (millis() - cutime));
   
-  digitalWrite(leftB, LOW);
+  //analogWrite(leftB, 0);
 }
 
 void left()
 {
   int cutime = millis();
-  int timeF = cutime;
-  
-  while(cutime - timeF < 500)
-  {
-    cutime = millis();
+  analogWrite(leftB,  0);
     
-    digitalWrite(rightB, HIGH);
+  analogWrite(rightB, 125);
 
-    Vector normalisedvalues = mpu.readNormalizeGyro();
-      
-    //Calculate yaw
-    yaw = yaw + normalisedvalues.XAxis * increasetime;
+  Vector normalisedvalues = mpu.readNormalizeGyro();
+    
+  //Calculate yaw
+  yaw = yaw + normalisedvalues.XAxis * increasetime;
 
-    delay((increasetime*1000) - (millis() - cutime));
-  }
-
-  digitalWrite(rightB, LOW);
+  delay((increasetime*1000) - (millis() - cutime));
+  
+  //analogWrite(rightB, 0);
 }
 
 void backward()
 {
-  digitalWrite(leftF, LOW);
-  digitalWrite(leftB, HIGH);
-  digitalWrite(rightF, LOW);
-  digitalWrite(rightB, HIGH);
+  analogWrite(leftF,  0);
+  analogWrite(rightF, 0);
+  
+  analogWrite(leftB,  125);
+  analogWrite(rightB, 125);
+
+  RPS();
+
+  //analogWrite(leftB,  0);
+  //analogWrite(rightB, 0);
+  
+  Serial.println("Backward");
 }
