@@ -21,10 +21,10 @@ const int trigPinB = A1;
 const int echoPinB = A0;
 const int encoderInL = 2;
 const int encoderInR = 4;
-const int leftF = 3;
-const int leftB = 5;
-const int rightF = 6;
-const int rightB = 9;
+const int leftF = 6;
+const int leftB = 9;
+const int rightF = 3;
+const int rightB = 5;
 
 //Variables required for calculations
 unsigned long timer = 0;
@@ -41,6 +41,10 @@ float rotationsLps;
 float rotationsRps;
 int meanDist;
 bool turning = false;
+
+//Variables used to calculate if the robot is travelling too far from the wall while moving forward, drifing solution
+bool firstRun = true;
+int lastDist = 0;
 
 //Function for working out rotations per second
 int counted = 0;
@@ -82,7 +86,7 @@ void loop() {
   // put your main code here, to run repeatedly:
   if(stopped)
   {
-    //Ping front sensor
+    //Ping sensors
     int distanceF = pingF();
     int distanceR = pingR();
     int distanceB = pingB();
@@ -93,16 +97,6 @@ void loop() {
     Serial.print("Distance moved from last stop: ");
     Serial.println(meanDist);
     
-    //Print rotation
-    if(yaw <=0)
-    {
-      yaw = 10.5 + yaw;
-    }
-    else
-    {
-      yaw = yaw - 10.5;
-    }
-    
     int roundedYaw = round(yaw);
     Serial.print("Current rotation: ");
     Serial.println(roundedYaw);
@@ -110,38 +104,39 @@ void loop() {
     //Print distance from front sensor
     Serial.print("Distance from front sensor: ");
     Serial.println(distanceF);
-    Serial.print("Distance from front sensor: ");
+    Serial.print("Distance from right sensor: ");
     Serial.println(distanceR);
-    Serial.print("Distance from front sensor: ");
+    Serial.print("Distance from back sensor: ");
     Serial.println(distanceB);
-    Serial.print("Distance from front sensor: ");
+    Serial.print("Distance from left sensor: ");
     Serial.println(distanceL);
     
     ////   Bluetooth   ////
     //Print distance moved since last check
-    //bluetooth.print("Distance moved from last stop: ");
     bluetooth.println(meanDist);
-    //bluetooth.print("\n");
+    bluetooth.print("\n");
       
     //Print rotation
-    //bluetooth.print("Current rotation: ");
     bluetooth.println(roundedYaw);
-    //bluetooth.print("\n");
+    bluetooth.print("\n");
     
-    //Print distance from front sensor
-    //bluetooth.print("Distance from front sensor: ");
+    //Print distance from sensors
     bluetooth.println(distanceF);
+    bluetooth.print("\n");
     bluetooth.println(distanceR);
+    bluetooth.print("\n");
     bluetooth.println(distanceB);
+    bluetooth.print("\n");
+    bluetooth.print("Distance left: ");
     bluetooth.println(distanceL);
-    //bluetooth.print("\n");
+    bluetooth.print("\n");
 
     stopped = false;
   }
   else
   {   
     int distanceF = pingF();
-  
+    
     //Get a time to return a value every second
     currenttime = millis();
     timer = currenttime;
@@ -149,31 +144,52 @@ void loop() {
     //unsigned long thistime = currenttime - timer;
     while(currenttime - timer < 500)
     {
-      forward();
+      int currentDist = pingL();
+      /*if(firstRun = true)
+      {
+        lastDist = currentDist;
+        firstRun = false;
+      }*/
+      
+      Serial.print("This is the current left sensor distance: ");
+      Serial.println(currentDist);
+      
+      if(currentDist < 30)
+      {
+        analogWrite(rightF, 132);
+        analogWrite(leftF, 170);
+      }
+      else if (currentDist > 30)
+      {
+        analogWrite(rightF, 162);
+        analogWrite(leftF, 140);
+      }
+      else
+      {
+        forward();
+      }
+      
       RPS();
       
       int distFromObj = pingF();
       Serial.print("Distance from front ");
       Serial.println(distFromObj);
-      if(distFromObj <= 20)
+      if(distFromObj <= 30)
       {
         float yawNow = yaw;
-        while(yaw >= yawNow - 90)
+        while(yaw >= yawNow - 89)
         {
           Serial.println(yawNow);
           Serial.println(yaw);
           right();
-          //while(yaw <= yawNow - 95)
-          //{
-            //left();
-          //}
         }
+        firstRun = true;
+        analogWrite(rightB, 0);
       }
       
       currenttime = millis();
     }
-
-    Serial.println("hello");
+    
     float rotationsLps = counterL/20;
     float rotationsRps = counterR/20;
   
@@ -184,37 +200,10 @@ void loop() {
   
     counterL = 0;
     counterR = 0;
-    
-    /*Serial.println("Turning right");
-    
-    right();
-    
-    Serial.println("Turning left");
-    
-    left();
-  
-    Serial.println("Stopping");*/
   
     stopped = true;
-
-    //delay((increasetime*1000) - (millis() - currenttime));
   }
 }
-
-      /*if(distanceF <= 10)
-      {
-        //Read normalised values
-        Vector normalisedvalues = mpu.readNormalizeGyro();
-      
-        //Calculate yaw
-        yaw = yaw + normalisedvalues.XAxis * increasetime;
-        
-        stopped = true;
-      }
-      //else
-      //{
-        //forward();
-      //}*/
 
 //Front sensor
 int pingF()
@@ -334,6 +323,22 @@ void HolesPerSecR()
   countedR = 1;
 }  
 
+void aligned()
+{
+  int distL = pingL();
+  int lowest = distL;
+
+  distL = pingL();
+  while(pingL < lowest)
+  {
+    if(distL < lowest)
+    {
+      lowest = distL;
+    }
+    right();
+  }
+}
+
 int whatWay()
 {
   int whatOne = 1;
@@ -374,7 +379,7 @@ int whatWay()
 
   bool needMove = false;
   
-  if(closest > 20)
+  if(closest > 30)
   {
     //move toward closest
     needMove = true;
@@ -382,84 +387,95 @@ int whatWay()
   
   switch(whatOne)
   {
+    //Forward
     case 1:
     if(needMove)
     {
-      while(closest >= 20)
+      while(closest >= 30)
       {
         forward();
         closest = pingF();
       }
-      while(yaw >= -90)
+      while(yaw >= -89)
       {
         right();
         Serial.println(yaw);
       }
+      
+      analogWrite(leftB, 0);
+      analogWrite(rightB, 0);
     }
     
     break;
-    
+
+    //Back
     case 2:
     if(needMove)
     {
-      while(closest >= 20)
+      while(closest >= 30)
       {
         backward();
         closest = pingB();
       }
-      while(yaw >= -90)
+      while(yaw >= -89)
       {
         right();
         Serial.println(yaw);
       }
+
+      analogWrite(leftB, 0);
+      analogWrite(rightB, 0);
     }
     
     break;
-    
+
+    //Left
     case 3:    
     if(needMove)
     {
-      while(yaw <= 90)
+      while(yaw <= 89)
       {
         left();
         Serial.println(yaw);
       }
       int getDistance = pingF();
-      while(getDistance >= 20)
+      while(getDistance >= 30)
       {
         forward();
         getDistance = pingF();
       }
-      while(yaw >= -90)
+      while(yaw >= -89)
       {
         right();
         Serial.println(yaw);
       }
+      analogWrite(leftB, 0);
     }
     
     break;
-    
+
+    //Right
     case 4:   
     if(needMove)
     {
-      Serial.println("Outside loop ran");
-      while(yaw >= -90)
+      while(yaw >= -89)
       {
-        Serial.println("Inside loop ran");
         right();
         Serial.println(yaw);
       }
       int getDistance = pingF();
-      while(getDistance >= 20)
+      while(getDistance >= 30)
       {
         forward();
         getDistance = pingF();
       }
-      while(yaw >= -90)
+      while(yaw >= -89)
       {
         right();
         Serial.println(yaw);
       }
+
+      analogWrite(rightB, 0);
     }
     
     break;
@@ -472,8 +488,8 @@ void forward()
   analogWrite(leftB,  0);
   analogWrite(rightB, 0);
   
-  analogWrite(leftF,  117);
-  analogWrite(rightF, 125);
+  analogWrite(leftF,  125);
+  analogWrite(rightF, 117);
 
   RPS();
 
@@ -485,36 +501,37 @@ void forward()
 
 void right()
 {
-  int cutime = millis();
-  analogWrite(rightB, 0);
-    
-  analogWrite(leftB, 125);
-
+  int currenttime = millis();
+  
   Vector normalisedvalues = mpu.readNormalizeGyro();
+  
+  analogWrite(leftB, 0);
+  analogWrite(rightF,  0);
+  analogWrite(leftF,  0);
     
+  analogWrite(rightB, 117);
+
   //Calculate yaw
   yaw = yaw + normalisedvalues.XAxis * increasetime;
 
-  delay((increasetime*1000) - (millis() - cutime));
-  
-  //analogWrite(leftB, 0);
+  delay((increasetime*1000) - (millis() - currenttime));
 }
 
 void left()
 {
-  int cutime = millis();
-  analogWrite(leftB,  0);
-    
-  analogWrite(rightB, 125);
-
+  int currenttime = millis();
+  
   Vector normalisedvalues = mpu.readNormalizeGyro();
+  
+  analogWrite(rightB,  0);
+  analogWrite(rightF,  0);
+  analogWrite(leftF,  0);
     
+  analogWrite(leftB, 125);
   //Calculate yaw
   yaw = yaw + normalisedvalues.XAxis * increasetime;
 
-  delay((increasetime*1000) - (millis() - cutime));
-  
-  //analogWrite(rightB, 0);
+  delay((increasetime*1000) - (millis() - currenttime));
 }
 
 void backward()
@@ -523,12 +540,9 @@ void backward()
   analogWrite(rightF, 0);
   
   analogWrite(leftB,  125);
-  analogWrite(rightB, 125);
+  analogWrite(rightB, 117);
 
   RPS();
-
-  //analogWrite(leftB,  0);
-  //analogWrite(rightB, 0);
   
   Serial.println("Backward");
 }
