@@ -79,13 +79,19 @@ void setup() {
   //Get the initial direction the robot is facing
   mpu.calibrateGyro();
 
-  whatWay();
+  //whatWay();
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
   if(stopped)
   {
+    //Stop movement
+    analogWrite(rightF, 0);
+    analogWrite(leftF, 0);
+    analogWrite(rightB, 0);
+    analogWrite(leftB, 0);
+    
     //Ping sensors
     int distanceF = pingF();
     int distanceR = pingR();
@@ -136,6 +142,8 @@ void loop() {
   else
   {   
     int distanceF = pingF();
+    Serial.println("setting currentdist");
+    int currentDist = pingL();
     
     //Get a time to return a value every second
     currenttime = millis();
@@ -144,28 +152,71 @@ void loop() {
     //unsigned long thistime = currenttime - timer;
     while(currenttime - timer < 500)
     {
-      int currentDist = pingL();
-      /*if(firstRun = true)
-      {
-        lastDist = currentDist;
-        firstRun = false;
-      }*/
-      
       Serial.print("This is the current left sensor distance: ");
       Serial.println(currentDist);
-      
-      if(currentDist < 30)
+
+      int lowestval = pingL();
+      int newval;
+      float goodYaw;
+      if(lowestval <= currentDist - 5)
       {
-        analogWrite(rightF, 132);
-        analogWrite(leftF, 170);
+        Serial.println("moved closer");
+        newval = pingL();
+        while(newval <= lowestval)
+        {
+          Serial.println("or here");
+          
+          right();
+          
+          newval = pingL();
+          
+          Serial.println("adjusting right");
+          Serial.println(newval);
+          Serial.println(lowestval);
+          
+          if(newval < lowestval)
+          {
+            lowestval = newval;
+          }
+        }
+        goodYaw = yaw;
+        while(yaw > goodYaw)
+        {
+          Serial.println("redjusting");
+          left();
+          //newval = pingL();
+        }
       }
-      else if (currentDist > 30)
+      else if(lowestval >= currentDist + 5)
       {
-        analogWrite(rightF, 162);
-        analogWrite(leftF, 140);
+        Serial.println("moved away");
+        newval = pingL();
+        while(newval <= lowestval)
+        {
+          left();
+
+          newval = pingL();
+
+          Serial.println("adjusting right");
+          Serial.println(newval);
+          Serial.println(lowestval);
+          
+          if(newval < lowestval)
+          {
+            lowestval = newval;
+          }
+        }
+        goodYaw = yaw;
+        while(yaw > goodYaw)
+        {
+          Serial.println("redjusting");
+          right();
+          //newval = pingL();
+        }
       }
       else
       {
+        Serial.println("forawrd");
         forward();
       }
       
@@ -181,14 +232,18 @@ void loop() {
         {
           Serial.println(yawNow);
           Serial.println(yaw);
+
           right();
+          //Calculate yaw
+          
         }
-        firstRun = true;
         analogWrite(rightB, 0);
+        currentDist = pingL();
       }
       
-      currenttime = millis();
+      //currenttime = millis();
     }
+    firstRun = true;
     
     float rotationsLps = counterL/20;
     float rotationsRps = counterR/20;
@@ -208,9 +263,6 @@ void loop() {
 //Front sensor
 int pingF()
 {
-  digitalWrite(trigPinF, LOW);
-  
-  delayMicroseconds(2);
   // Sets the trigPin on HIGH state for 10 micro seconds
   digitalWrite(trigPinF, HIGH);
   
@@ -227,9 +279,6 @@ int pingF()
 
 int pingL()
 {
-  digitalWrite(trigPinL, LOW);
-
-  delayMicroseconds(2);
   digitalWrite(trigPinL, HIGH);
 
   delayMicroseconds(10);
@@ -243,9 +292,6 @@ int pingL()
 
 int pingR()
 {
-  digitalWrite(trigPinR, LOW);
-
-  delayMicroseconds(2);
   digitalWrite(trigPinR, HIGH);
 
   delayMicroseconds(10);
@@ -259,9 +305,6 @@ int pingR()
 
 int pingB()
 {
-  digitalWrite(trigPinB, LOW);
-
-  delayMicroseconds(2);
   digitalWrite(trigPinB, HIGH);
 
   delayMicroseconds(10);
@@ -345,6 +388,7 @@ int whatWay()
   int distF = pingF();
   int closest = distF;
   int distB = pingB();
+  float yawNow;
   Serial.println(closest);
   Serial.println(whatOne);
 
@@ -396,7 +440,9 @@ int whatWay()
         forward();
         closest = pingF();
       }
-      while(yaw >= -89)
+      
+      yawNow = yaw;
+      while(yaw >= yawNow -89)
       {
         right();
         Serial.println(yaw);
@@ -417,7 +463,8 @@ int whatWay()
         backward();
         closest = pingB();
       }
-      while(yaw >= -89)
+      yawNow = yaw;
+      while(yaw >= yawNow -89)
       {
         right();
         Serial.println(yaw);
@@ -433,7 +480,8 @@ int whatWay()
     case 3:    
     if(needMove)
     {
-      while(yaw <= 89)
+      yawNow = yaw;
+      while(yaw >= yawNow +89)
       {
         left();
         Serial.println(yaw);
@@ -444,7 +492,8 @@ int whatWay()
         forward();
         getDistance = pingF();
       }
-      while(yaw >= -89)
+      yawNow = yaw;
+      while(yaw >= yawNow -89)
       {
         right();
         Serial.println(yaw);
@@ -458,7 +507,8 @@ int whatWay()
     case 4:   
     if(needMove)
     {
-      while(yaw >= -89)
+      yawNow = yaw;
+      while(yaw >= yawNow -89)
       {
         right();
         Serial.println(yaw);
@@ -469,7 +519,8 @@ int whatWay()
         forward();
         getDistance = pingF();
       }
-      while(yaw >= -89)
+      yawNow = yaw;
+      while(yaw >= yawNow -89)
       {
         right();
         Serial.println(yaw);
@@ -501,37 +552,48 @@ void forward()
 
 void right()
 {
-  int currenttime = millis();
-  
+  currenttime = millis(); 
   Vector normalisedvalues = mpu.readNormalizeGyro();
-  
+          
   analogWrite(leftB, 0);
   analogWrite(rightF,  0);
   analogWrite(leftF,  0);
     
-  analogWrite(rightB, 117);
+  analogWrite(rightB, 122);
 
-  //Calculate yaw
   yaw = yaw + normalisedvalues.XAxis * increasetime;
 
-  delay((increasetime*1000) - (millis() - currenttime));
+  if(millis() - currenttime > 9)
+  {
+    delay((increasetime*2000) - (millis() - currenttime));
+  }
+  else
+  {
+    delay((increasetime*1000) - (millis() - currenttime));
+  }
 }
 
 void left()
 {
-  int currenttime = millis();
-  
+  currenttime = millis(); 
   Vector normalisedvalues = mpu.readNormalizeGyro();
   
   analogWrite(rightB,  0);
   analogWrite(rightF,  0);
   analogWrite(leftF,  0);
     
-  analogWrite(leftB, 125);
-  //Calculate yaw
-  yaw = yaw + normalisedvalues.XAxis * increasetime;
+  analogWrite(leftB, 130);
 
-  delay((increasetime*1000) - (millis() - currenttime));
+  yaw = yaw + normalisedvalues.XAxis * increasetime;
+          
+  if(millis() - currenttime > 9)
+  {
+    delay((increasetime*2000) - (millis() - currenttime));
+  }
+  else
+  {
+    delay((increasetime*1000) - (millis() - currenttime));
+  }
 }
 
 void backward()
