@@ -2,15 +2,14 @@
 #include <Wire.h>
 #include <MPU6050.h>
 #include <math.h>
-#include <Stepper.h>
 
-//Set up the serial input/output
+//Set up the serial input/output.
 SoftwareSerial bluetooth(8,7);
 
-//Set the magentometer ready for use
+//Set the magentometer ready for use.
 MPU6050 mpu;
 
-//Pins for connected sensors
+//Pins for connected sensors.
 const int trigPinF = 13;
 const int echoPinF = 12;
 const int trigPinL = 10;
@@ -26,7 +25,7 @@ const int leftB = 9;
 const int rightF = 3;
 const int rightB = 5;
 
-//Variables required for calculations
+//Variables required for calculations.
 unsigned long timer = 0;
 float increasetime = 0.01;
 unsigned long currenttime = 0;
@@ -42,331 +41,334 @@ float rotationsRps;
 int meanDist;
 bool turning = false;
 
-//Function for working out rotations per second
+//Function for working out rotations per second.
 int counted = 0;
 int countedR = 0;
 
 void setup() {
-  // put your setup code here, to run once:
-  Serial.begin(115200); //Begin the serial monitor at 115200
-  bluetooth.begin(115200); //Begin the bluetooth serial at 115200
-  
-  pinMode(trigPinF, OUTPUT); // Sets the trigPin as an Output
-  pinMode(echoPinF, INPUT); // Sets the echoPin as an Input  
-  pinMode(trigPinL, OUTPUT);
-  pinMode(echoPinL, INPUT);
-  pinMode(trigPinR, OUTPUT);
-  pinMode(echoPinR, INPUT);
-  pinMode(trigPinB, OUTPUT);
-  pinMode(echoPinB, INPUT);
-  pinMode(leftF, OUTPUT); //Set pins for motors as an output
-  pinMode(leftB, OUTPUT);
-  pinMode(rightF, OUTPUT);
-  pinMode(rightB, OUTPUT);
-  pinMode(encoderInL, INPUT); //Set pins for wheel encoders
-  pinMode(encoderInR, INPUT); //as input
+	Serial.begin(115200); //Begin the serial monitor at 115200.
+	bluetooth.begin(115200); //Begin the bluetooth serial at 115200.
 
-  //--FOR SETTING UP MPU ONLY
-  while(!mpu.begin(MPU6050_SCALE_2000DPS, MPU6050_RANGE_2G))
-  {
-    Serial.println("Could not find a valud MPU6050 sensor");
-    delay(500);
-  }
-  //Get the initial direction the robot is facing
-  mpu.calibrateGyro();
+	pinMode(trigPinF, OUTPUT); // Sets the trigPin as an Output.
+	pinMode(echoPinF, INPUT); // Sets the echoPin as an Input.
+	pinMode(trigPinL, OUTPUT);
+	pinMode(echoPinL, INPUT);
+	pinMode(trigPinR, OUTPUT);
+	pinMode(echoPinR, INPUT);
+	pinMode(trigPinB, OUTPUT);
+	pinMode(echoPinB, INPUT);
+	pinMode(leftF, OUTPUT); //Set pins for motors as an output.
+	pinMode(leftB, OUTPUT);
+	pinMode(rightF, OUTPUT);
+	pinMode(rightB, OUTPUT);
+	pinMode(encoderInL, INPUT); //Set pins for wheel encoders.
+	pinMode(encoderInR, INPUT); //as input.
 
-  //whatWay();
+	//FOR SETTING UP MPU ONLY.
+	while(!mpu.begin(MPU6050_SCALE_2000DPS, MPU6050_RANGE_2G))
+	{
+		Serial.println("Could not find a valud MPU6050 sensor");
+		delay(500);
+	}
+	
+	//Get the initial direction the robot is facing.
+	mpu.calibrateGyro();
+	
+	//Find closest wall.
+	whatWay();
 }
 
-void loop() {
-  //Put your main code here, to run repeatedly.
-  if(stopped)
-  {
-    //Stop movement
-    analogWrite(rightF, 0);
-    analogWrite(leftF, 0);
-    analogWrite(rightB, 0);
-    analogWrite(leftB, 0);
-    
-    //Ping sensors
-    int distanceF = pingF();
-    int distanceR = pingR();
-    int distanceB = pingB();
-    int distanceL = pingL();
-    
-    /*
-    //THIS IS FOR TESTING PURPOSES
-    ////    Serial    ////
-    //Print distance moved since last check
-    Serial.print("Distance moved from last stop: ");
-    Serial.println(meanDist);
-    
-    int roundedYaw = round(yaw);
-    Serial.print("Current rotation: ");
-    Serial.println(roundedYaw);
+void loop() 
+{
+	//This if else could be replaced by as it is somewhat redundant, becomes clear why in the else.
+	if(stopped)
+	{
+		//Stop movement
+		analogWrite(rightF, 0);
+		analogWrite(leftF, 0);
+		analogWrite(rightB, 0);
+		analogWrite(leftB, 0);
 
-    //Print distance from front sensor
-    Serial.print("Distance from front sensor: ");
-    Serial.println(distanceF);
-    Serial.print("Distance from right sensor: ");
-    Serial.println(distanceR);
-    Serial.print("Distance from back sensor: ");
-    Serial.println(distanceB);
-    Serial.print("Distance from left sensor: ");
-    Serial.println(distanceL);
-    */
-    
-    ////   Bluetooth   ////
-    //Print distance moved since last check
-    bluetooth.println(meanDist);
-    bluetooth.print("\n");
-      
-    //Print rotation
-    bluetooth.println(roundedYaw);
-    bluetooth.print("\n");
-    
-    //Print distance from sensors
-    bluetooth.println(distanceF);
-    bluetooth.print("\n");
-    bluetooth.println(distanceR);
-    bluetooth.print("\n");
-    bluetooth.println(distanceB);
-    bluetooth.print("\n");
-    bluetooth.print("Distance left: ");
-    bluetooth.println(distanceL);
-    bluetooth.print("\n");
+		//Ping sensors
+		int distanceF = pingF();
+		int distanceR = pingR();
+		int distanceB = pingB();
+		int distanceL = pingL();
 
-    stopped = false;
-  }
-  else
-  {   
-    //Setup distances.
-    int distanceF = pingF();
-    int currentDist = pingL();
+		/*
+		//THIS IS FOR TESTING PURPOSES
+		////    Serial    ////
+		//Print distance moved since last check
+		Serial.print("Distance moved from last stop: ");
+		Serial.println(meanDist);
 
-    //Get a time to return a value every second.
-    currenttime = millis();
-    timer = currenttime;
+		int roundedYaw = round(yaw);
+		Serial.print("Current rotation: ");
+		Serial.println(roundedYaw);
 
-    //Execute every 0.5 seconds.
-    while (currenttime - timer < 500)
-    {
-      //Set lowest distance to left wall recorded.
-      int lowestval = pingL();
-      int newval;
-      float goodYaw;
+		//Print distance from front sensor
+		Serial.print("Distance from front sensor: ");
+		Serial.println(distanceF);
+		Serial.print("Distance from right sensor: ");
+		Serial.println(distanceR);
+		Serial.print("Distance from back sensor: ");
+		Serial.println(distanceB);
+		Serial.print("Distance from left sensor: ");
+		Serial.println(distanceL);
+		*/
 
-      //Check to see if lowestval has changed by 5cm up or down in the past 0.5s time frame, if not proceed forward.
-      //This is for turning right (robot too close to wall).
-      if (lowestval <= currentDist - 5)
-      {
-        //Setup newval, keep turning right until value stops getting lower.
-        newval = pingL();
-        while (newval <= lowestval)
-        {
-          right();
-          newval = pingL();
+		////   Bluetooth   ////
+		//Print distance moved since last check
+		bluetooth.println(meanDist);
+		bluetooth.print("\n");
 
-          //Set new lowestval and set goodYaw as the yaw at the lowest value.
-          if (newval < lowestval)
-          {
-            lowestval = newval;
-            goodYaw = yaw;
-          }
-        }
+		//Print rotation
+		bluetooth.println(roundedYaw);
+		bluetooth.print("\n");
 
-        //Turn left until back at the goodYaw.
-        while (yaw > goodYaw)
-        {
-          left();
-        }
-      }
-      //This is for turning left (robot too far from wall).
-      else if (lowestval >= currentDist + 5)
-      {
-        //Setup newval, keep turning left until value stops getting lower.
-        newval = pingL();
-        while (newval <= lowestval)
-        {
-          left();
-          newval = pingL();
+		//Print distance from sensors
+		bluetooth.println(distanceF);
+		bluetooth.print("\n");
+		bluetooth.println(distanceR);
+		bluetooth.print("\n");
+		bluetooth.println(distanceB);
+		bluetooth.print("\n");
+		bluetooth.print("Distance left: ");
+		bluetooth.println(distanceL);
+		bluetooth.print("\n");
 
-          //Set new lowestval and set goodYaw as the yaw at the lowest value.
-          if (newval < lowestval)
-          {
-            lowestval = newval;
-            goodYaw = yaw;
-          }
-        }
+		stopped = false;
+	}
+	else
+	{   
+		//Setup distances.
+		int distanceF = pingF();
+		int currentDist = pingL();
 
-        //Turn left until back at the goodYaw.
-        while (yaw > goodYaw)
-        {
-          right();
-        }
-      }
-      else
-      {
-        forward();
-      }
-      
-      RPS();
-      
-      //Setup distance from front sensor.
-	    int distFromObj = pingF();
+		//Get a time to return a value every second.
+		currenttime = millis();
+		timer = currenttime;
 
-      //If front sensor pings 30cm or lower turn 90 degrees right.
-      if (distFromObj <= 30)
-      {
-        float yawNow = yaw;
-        while (yaw >= yawNow - 89)
-        {
-          right();
-        }
-          //Stop back motor and setup current left distance for next run of loop.
-          analogWrite(rightB, 0);
-          currentDist = pingL();
-        }
-      }
-    
-      float rotationsLps = counterL/20;
-      float rotationsRps = counterR/20;
+		//Execute every 0.5 seconds.
+		while (currenttime - timer < 500)
+		{
+			//Set lowest distance to left wall recorded.
+			int lowestval = pingL();
+			int newval;
+			float goodYaw;
 
-      float disL = distL(rotationsLps);
-      float disR = distR(rotationsRps);
+			//Check to see if lowestval has changed by 5cm up or down in the past 0.5s time frame, if not proceed forward.
+			//This is for turning right (robot too close to wall).
+			if (lowestval <= currentDist - 5)
+			{
+				//Setup newval, keep turning right until value stops getting lower.
+				newval = pingL();
+				while (newval <= lowestval)
+				{
+					right();
+					newval = pingL();
 
-      meanDist = round((disL + disR) / 2);
+					//Set new lowestval and set goodYaw as the yaw at the lowest value.
+					if (newval < lowestval)
+					{
+						lowestval = newval;
+						goodYaw = yaw;
+					}
+				}
 
-      counterL = 0;
-      counterR = 0;
+				//Turn left until back at the goodYaw.
+				while (yaw > goodYaw)
+				{
+					left();
+				}
+			}
+			//This is for turning left (robot too far from wall).
+			else if (lowestval >= currentDist + 5)
+			{
+				//Setup newval, keep turning left until value stops getting lower.
+				newval = pingL();
+				while (newval <= lowestval)
+				{
+					left();
+					newval = pingL();
 
-      stopped = true;
-   }
+					//Set new lowestval and set goodYaw as the yaw at the lowest value.
+					if (newval < lowestval)
+					{
+					lowestval = newval;
+					goodYaw = yaw;
+					}
+				}
+
+				//Turn left until back at the goodYaw.
+				while (yaw > goodYaw)
+				{
+					right();
+				}
+			}
+			else
+			{
+				forward();
+			}
+
+			RPS();
+
+			//Setup distance from front sensor.
+			int distFromObj = pingF();
+
+			//If front sensor pings 30cm or lower turn 90 degrees right.
+			if (distFromObj <= 30)
+			{
+				float yawNow = yaw;
+				while (yaw >= yawNow - 89)
+			{
+				right();
+			}
+			//Stop back motor and setup current left distance for next run of loop.
+			analogWrite(rightB, 0);
+			currentDist = pingL();
+			}
+		}
+
+		float rotationsLps = counterL/20;
+		float rotationsRps = counterR/20;
+
+		float disL = distL(rotationsLps);
+		float disR = distR(rotationsRps);
+
+		meanDist = round((disL + disR) / 2);
+
+		counterL = 0;
+		counterR = 0;
+
+		stopped = true;
+	}
 }
 
 //Front sensor
 int pingF()
 {
-  // Sets the trigPin on HIGH state for 10 micro seconds
-  digitalWrite(trigPinF, HIGH);
-  
-  delayMicroseconds(10);
-  
-  digitalWrite(trigPinF, LOW);
-  // Reads the echoPin, returns the sound wave travel time in microseconds
-  long duration = pulseIn(echoPinF, HIGH);
-  
-  // Calculating the distance
-  int distance = duration*0.034/2;
-  return distance;
+	// Sets the trigPin on HIGH state for 10 micro seconds
+	digitalWrite(trigPinF, HIGH);
+
+	delayMicroseconds(10);
+
+	digitalWrite(trigPinF, LOW);
+	// Reads the echoPin, returns the sound wave travel time in microseconds
+	long duration = pulseIn(echoPinF, HIGH);
+
+	// Calculating the distance
+	int distance = duration*0.034/2;
+	return distance;
 }
 
 //Left sensor
 int pingL()
 {
-  digitalWrite(trigPinL, HIGH);
+	digitalWrite(trigPinL, HIGH);
 
-  delayMicroseconds(10);
+	delayMicroseconds(10);
 
-  digitalWrite(trigPinL, LOW);
-  long duration = pulseIn(echoPinL, HIGH);
+	digitalWrite(trigPinL, LOW);
+	long duration = pulseIn(echoPinL, HIGH);
 
-  int distance = duration*0.034/2;
-  return distance;
+	int distance = duration*0.034/2;
+	return distance;
 }
 
 //Right sensor
 int pingR()
 {
-  digitalWrite(trigPinR, HIGH);
+	digitalWrite(trigPinR, HIGH);
 
-  delayMicroseconds(10);
+	delayMicroseconds(10);
 
-  digitalWrite(trigPinR, LOW);
-  long duration = pulseIn(echoPinR, HIGH);
+	digitalWrite(trigPinR, LOW);
+	long duration = pulseIn(echoPinR, HIGH);
 
-  int distance = duration*0.034/2;
-  return distance;
+	int distance = duration*0.034/2;
+	return distance;
 }
 
 //Back sensor
 int pingB()
 {
-  digitalWrite(trigPinB, HIGH);
+	digitalWrite(trigPinB, HIGH);
 
-  delayMicroseconds(10);
+	delayMicroseconds(10);
 
-  digitalWrite(trigPinB, LOW);
-  long duration = pulseIn(echoPinB, HIGH);
+	digitalWrite(trigPinB, LOW);
+	long duration = pulseIn(echoPinB, HIGH);
 
-  int distance = duration*0.034/2;
-  return distance;
+	int distance = duration*0.034/2;
+	return distance;
 }
 
 void RPS()
 {
-    //Used to calculate the number of rotations of the wheel
-    encoderLstate = digitalRead(encoderInL);
-    encoderRstate = digitalRead(encoderInR);
-    
-    if(encoderLstate == HIGH && counted == 0)
-    {
-      HolesPerSecL();
-    }
-    if(encoderLstate == LOW)
-    {
-      counted = 0;
-    }
-    if(encoderRstate == HIGH && countedR == 0)
-    {
-      HolesPerSecR();
-    }
-    if(encoderRstate == LOW)
-    {
-      countedR = 0;
-    }
+	//Used to calculate the number of rotations of the wheel
+	encoderLstate = digitalRead(encoderInL);
+	encoderRstate = digitalRead(encoderInR);
+
+	if(encoderLstate == HIGH && counted == 0)
+	{
+		HolesPerSecL();
+	}
+	if(encoderLstate == LOW)
+	{
+		counted = 0;
+	}
+	if(encoderRstate == HIGH && countedR == 0)
+	{
+		HolesPerSecR();
+	}
+	if(encoderRstate == LOW)
+	{
+		countedR = 0;
+	}
 }
 
 float distL(float rotationsLps)
 {
-  float distanceL = (circumference*rotationsLps);
+	float distanceL = (circumference*rotationsLps);
 
-  return distanceL;
+	return distanceL;
 }
 
 float distR(float rotationsRps)
 {
-  float distanceR = (circumference*rotationsRps);
-  
-  return distanceR;
+	float distanceR = (circumference*rotationsRps);
+
+	return distanceR;
 }
 
 //Functions to increment the steps counted with each motor turn
 void HolesPerSecL()
 {
-  counterL++;
-  counted = 1;
+	counterL++;
+	counted = 1;
 }
+
 void HolesPerSecR()
 {
-  counterR++;
-  countedR = 1;
+	counterR++;
+	countedR = 1;
 }  
 
 void aligned()
 {
-  int distL = pingL();
-  int lowest = distL;
+	int distL = pingL();
+	int lowest = distL;
 
-  distL = pingL();
-  while(pingL < lowest)
-  {
-    if(distL < lowest)
-    {
-      lowest = distL;
-    }
-    right();
-  }
+	distL = pingL();
+	while(pingL < lowest)
+	{
+		if(distL < lowest)
+		{
+		lowest = distL;
+		}
+		right();
+  	}
 }
 
 int whatWay()
@@ -522,69 +524,69 @@ int whatWay()
 //Functions for movement of the robot
 void forward()
 {
-  analogWrite(leftB,  0);
-  analogWrite(rightB, 0);
-  
-  //Different values to conteract the imbalance in the motors. These can be changed, higher = faster.
-  analogWrite(leftF,  125);
-  analogWrite(rightF, 117);
+	analogWrite(leftB,  0);
+	analogWrite(rightB, 0);
 
-  RPS();
+	//Different values to conteract the imbalance in the motors. These can be changed, higher = faster.
+	analogWrite(leftF,  125);
+	analogWrite(rightF, 117);
+
+	RPS();
 }
 
 void right()
 {
-  currenttime = millis(); 
-  Vector normalisedvalues = mpu.readNormalizeGyro();
-          
-  analogWrite(leftB, 0);
-  analogWrite(rightF,  0);
-  analogWrite(leftF,  0);
-    
-  analogWrite(rightB, 122);
+	currenttime = millis(); 
+	Vector normalisedvalues = mpu.readNormalizeGyro();
 
-  yaw = yaw + normalisedvalues.XAxis * increasetime;
+	analogWrite(leftB, 0);
+	analogWrite(rightF,  0);
+	analogWrite(leftF,  0);
 
-  if(millis() - currenttime > 9)
-  {
-    delay((increasetime*2000) - (millis() - currenttime));
-  }
-  else
-  {
-    delay((increasetime*1000) - (millis() - currenttime));
-  }
+	analogWrite(rightB, 122);
+
+	yaw = yaw + normalisedvalues.XAxis * increasetime;
+
+	if(millis() - currenttime > 9)
+	{
+	delay((increasetime*2000) - (millis() - currenttime));
+	}
+	else
+	{
+	delay((increasetime*1000) - (millis() - currenttime));
+	}
 }
 
 void left()
 {
-  currenttime = millis(); 
-  Vector normalisedvalues = mpu.readNormalizeGyro();
-  
-  analogWrite(rightB,  0);
-  analogWrite(rightF,  0);
-  analogWrite(leftF,  0);
-    
-  analogWrite(leftB, 130);
+	currenttime = millis(); 
+	Vector normalisedvalues = mpu.readNormalizeGyro();
 
-  yaw = yaw + normalisedvalues.XAxis * increasetime;
-          
-  if(millis() - currenttime > 9)
-  {
-    delay((increasetime*2000) - (millis() - currenttime));
-  }
-  else
-  {
-    delay((increasetime*1000) - (millis() - currenttime));
-  }
+	analogWrite(rightB,  0);
+	analogWrite(rightF,  0);
+	analogWrite(leftF,  0);
+
+	analogWrite(leftB, 130);
+
+	yaw = yaw + normalisedvalues.XAxis * increasetime;
+
+	if(millis() - currenttime > 9)
+	{
+	delay((increasetime*2000) - (millis() - currenttime));
+	}
+	else
+	{
+	delay((increasetime*1000) - (millis() - currenttime));
+	}
 }
 
 void backward()
 {
-  analogWrite(leftF,  0);
-  analogWrite(rightF, 0);
-  
-  analogWrite(leftB,  125);
-  analogWrite(rightB, 117);
+	analogWrite(leftF,  0);
+	analogWrite(rightF, 0);
 
-  RPS();
+	analogWrite(leftB,  125);
+	analogWrite(rightB, 117);
+
+	RPS();
 }
