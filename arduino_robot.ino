@@ -45,7 +45,8 @@ bool turning = false;
 int counted = 0;
 int countedR = 0;
 
-void setup() {
+void setup() 
+{
 	Serial.begin(115200); //Begin the serial monitor at 115200.
 	bluetooth.begin(115200); //Begin the bluetooth serial at 115200.
 
