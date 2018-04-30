@@ -42,10 +42,6 @@ float rotationsRps;
 int meanDist;
 bool turning = false;
 
-//Variables used to calculate if the robot is travelling too far from the wall while moving forward, drifing solution
-bool firstRun = true;
-int lastDist = 0;
-
 //Function for working out rotations per second
 int counted = 0;
 int countedR = 0;
@@ -83,7 +79,7 @@ void setup() {
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
+  //Put your main code here, to run repeatedly.
   if(stopped)
   {
     //Stop movement
@@ -98,6 +94,8 @@ void loop() {
     int distanceB = pingB();
     int distanceL = pingL();
     
+    /*
+    //THIS IS FOR TESTING PURPOSES
     ////    Serial    ////
     //Print distance moved since last check
     Serial.print("Distance moved from last stop: ");
@@ -116,6 +114,7 @@ void loop() {
     Serial.println(distanceB);
     Serial.print("Distance from left sensor: ");
     Serial.println(distanceL);
+    */
     
     ////   Bluetooth   ////
     //Print distance moved since last check
@@ -141,123 +140,108 @@ void loop() {
   }
   else
   {   
+    //Setup distances.
     int distanceF = pingF();
-    Serial.println("setting currentdist");
     int currentDist = pingL();
-    
-    //Get a time to return a value every second
+
+    //Get a time to return a value every second.
     currenttime = millis();
     timer = currenttime;
-  
-    //unsigned long thistime = currenttime - timer;
-    while(currenttime - timer < 500)
-    {
-      Serial.print("This is the current left sensor distance: ");
-      Serial.println(currentDist);
 
+    //Execute every 0.5 seconds.
+    while (currenttime - timer < 500)
+    {
+      //Set lowest distance to left wall recorded.
       int lowestval = pingL();
       int newval;
       float goodYaw;
-      if(lowestval <= currentDist - 5)
+
+      //Check to see if lowestval has changed by 5cm up or down in the past 0.5s time frame, if not proceed forward.
+      //This is for turning right (robot too close to wall).
+      if (lowestval <= currentDist - 5)
       {
-        Serial.println("moved closer");
+        //Setup newval, keep turning right until value stops getting lower.
         newval = pingL();
-        while(newval <= lowestval)
+        while (newval <= lowestval)
         {
-          Serial.println("or here");
-          
           right();
-          
           newval = pingL();
-          
-          Serial.println("adjusting right");
-          Serial.println(newval);
-          Serial.println(lowestval);
-          
-          if(newval < lowestval)
+
+          //Set new lowestval and set goodYaw as the yaw at the lowest value.
+          if (newval < lowestval)
           {
             lowestval = newval;
+            goodYaw = yaw;
           }
         }
-        goodYaw = yaw;
-        while(yaw > goodYaw)
+
+        //Turn left until back at the goodYaw.
+        while (yaw > goodYaw)
         {
-          Serial.println("redjusting");
           left();
-          //newval = pingL();
         }
       }
-      else if(lowestval >= currentDist + 5)
+      //This is for turning left (robot too far from wall).
+      else if (lowestval >= currentDist + 5)
       {
-        Serial.println("moved away");
+        //Setup newval, keep turning left until value stops getting lower.
         newval = pingL();
-        while(newval <= lowestval)
+        while (newval <= lowestval)
         {
           left();
-
           newval = pingL();
 
-          Serial.println("adjusting right");
-          Serial.println(newval);
-          Serial.println(lowestval);
-          
-          if(newval < lowestval)
+          //Set new lowestval and set goodYaw as the yaw at the lowest value.
+          if (newval < lowestval)
           {
             lowestval = newval;
+            goodYaw = yaw;
           }
         }
-        goodYaw = yaw;
-        while(yaw > goodYaw)
+
+        //Turn left until back at the goodYaw.
+        while (yaw > goodYaw)
         {
-          Serial.println("redjusting");
           right();
-          //newval = pingL();
         }
       }
       else
       {
-        Serial.println("forawrd");
         forward();
       }
       
       RPS();
       
-      int distFromObj = pingF();
-      Serial.print("Distance from front ");
-      Serial.println(distFromObj);
-      if(distFromObj <= 30)
+      //Setup distance from front sensor.
+	    int distFromObj = pingF();
+
+      //If front sensor pings 30cm or lower turn 90 degrees right.
+      if (distFromObj <= 30)
       {
         float yawNow = yaw;
-        while(yaw >= yawNow - 89)
+        while (yaw >= yawNow - 89)
         {
-          Serial.println(yawNow);
-          Serial.println(yaw);
-
           right();
-          //Calculate yaw
-          
         }
-        analogWrite(rightB, 0);
-        currentDist = pingL();
+          //Stop back motor and setup current left distance for next run of loop.
+          analogWrite(rightB, 0);
+          currentDist = pingL();
+        }
       }
-      
-      //currenttime = millis();
-    }
-    firstRun = true;
     
-    float rotationsLps = counterL/20;
-    float rotationsRps = counterR/20;
-  
-    float disL = distL(rotationsLps);
-    float disR = distR(rotationsRps);
-  
-    meanDist = round((disL + disR) / 2);
-  
-    counterL = 0;
-    counterR = 0;
-  
-    stopped = true;
-  }
+      float rotationsLps = counterL/20;
+      float rotationsRps = counterR/20;
+
+      float disL = distL(rotationsLps);
+      float disR = distR(rotationsRps);
+
+      meanDist = round((disL + disR) / 2);
+
+      counterL = 0;
+      counterR = 0;
+
+      stopped = true;
+   }
 }
 
 //Front sensor
@@ -277,6 +261,7 @@ int pingF()
   return distance;
 }
 
+//Left sensor
 int pingL()
 {
   digitalWrite(trigPinL, HIGH);
@@ -290,6 +275,7 @@ int pingL()
   return distance;
 }
 
+//Right sensor
 int pingR()
 {
   digitalWrite(trigPinR, HIGH);
@@ -303,6 +289,7 @@ int pingR()
   return distance;
 }
 
+//Back sensor
 int pingB()
 {
   digitalWrite(trigPinB, HIGH);
@@ -384,154 +371,153 @@ void aligned()
 
 int whatWay()
 {
-  int whatOne = 1;
-  int distF = pingF();
-  int closest = distF;
-  int distB = pingB();
-  float yawNow;
-  Serial.println(closest);
-  Serial.println(whatOne);
+	//Setup values, set front sensor as lowest value.
+	int whatOne = 1;
+	int distF = pingF();
+	int closest = distF;
+	int distB = pingB();
+	float yawNow;
+	bool needMove = false;
 
-  if (distB < closest)
-  {
-    closest = distB;
-    whatOne = 2;
-  }
-  Serial.println(closest);
-  Serial.println(whatOne);
-  
-  int distL = pingL();
+	//Check if back sensor is closer than front sensor, if yes set as closest value.
+	if (distB < closest)
+	{
+		closest = distB;
+		whatOne = 2;
+	}
 
-  if (distL < closest)
-  {
-    closest = distL;
-    whatOne = 3;
-  }
-  Serial.println(closest);
-  Serial.println(whatOne);
-  
-  int distR = pingR();
+	int distL = pingL();
 
-  if (distR < closest)
-  {
-    closest = distR;
-    whatOne = 4;
-  }
+	//Check if left sensor is closer than front sensor, if yes set as closest value.
+	if (distL < closest)
+	{
+		closest = distL;
+		whatOne = 3;
+	}
 
-  Serial.println(closest);
-  Serial.println(whatOne);
+	int distR = pingR();
 
-  bool needMove = false;
-  
-  if(closest > 30)
-  {
-    //move toward closest
-    needMove = true;
-  }
-  
-  switch(whatOne)
-  {
-    //Forward
-    case 1:
-    if(needMove)
-    {
-      while(closest >= 30)
-      {
-        forward();
-        closest = pingF();
-      }
-      
-      yawNow = yaw;
-      while(yaw >= yawNow -89)
-      {
-        right();
-        Serial.println(yaw);
-      }
-      
-      analogWrite(leftB, 0);
-      analogWrite(rightB, 0);
-    }
-    
-    break;
+	//Check if right sensor is closer than front sensor, if yes set as closest value.
+	if (distR < closest)
+	{
+		closest = distR;
+		whatOne = 4;
+	}
 
-    //Back
-    case 2:
-    if(needMove)
-    {
-      while(closest >= 30)
-      {
-        backward();
-        closest = pingB();
-      }
-      yawNow = yaw;
-      while(yaw >= yawNow -89)
-      {
-        right();
-        Serial.println(yaw);
-      }
+	//If closest > 30 then move toward closest
+	if (closest > 30)
+	{
+		needMove = true;
+	}
 
-      analogWrite(leftB, 0);
-      analogWrite(rightB, 0);
-    }
-    
-    break;
+	if (needMove)
+	{
+		switch (whatOne)
+		{
+		//Forward
+		case 1:
+			//Forward until front sensor < 30
+			while (closest >= 30)
+			{
+				forward();
+				closest = pingF();
+			}
 
-    //Left
-    case 3:    
-    if(needMove)
-    {
-      yawNow = yaw;
-      while(yaw >= yawNow +89)
-      {
-        left();
-        Serial.println(yaw);
-      }
-      int getDistance = pingF();
-      while(getDistance >= 30)
-      {
-        forward();
-        getDistance = pingF();
-      }
-      yawNow = yaw;
-      while(yaw >= yawNow -89)
-      {
-        right();
-        Serial.println(yaw);
-      }
-      analogWrite(leftB, 0);
-    }
-    
-    break;
+			//Turn right so that close wall is on the left.
+			yawNow = yaw;
+			while (yaw >= yawNow - 89)
+			{
+				right();
+			}
 
-    //Right
-    case 4:   
-    if(needMove)
-    {
-      yawNow = yaw;
-      while(yaw >= yawNow -89)
-      {
-        right();
-        Serial.println(yaw);
-      }
-      int getDistance = pingF();
-      while(getDistance >= 30)
-      {
-        forward();
-        getDistance = pingF();
-      }
-      yawNow = yaw;
-      while(yaw >= yawNow -89)
-      {
-        right();
-        Serial.println(yaw);
-      }
+			//Turn off motors.
+			analogWrite(leftB, 0);
+			analogWrite(rightB, 0);
 
-      analogWrite(rightB, 0);
-    }
-    
-    break;
-  } 
-} 
+			break;
+
+		//Back
+		case 2:
+			//Backwards until back sensor < 30
+			while (closest >= 30)
+			{
+				backward();
+				closest = pingB();
+			}
+
+			//Turn left so that close wall is on the left.
+			yawNow = yaw;
+			while (yaw >= yawNow + 89)
+			{
+				left();
+			}
+
+			//Turn off motors.
+			analogWrite(leftB, 0);
+			analogWrite(rightB, 0);
+
+			break;
+
+		//Left
+		case 3:
+			//Turn left so that close wall is infront.
+			yawNow = yaw;
+			while (yaw >= yawNow + 89)
+			{
+				left();
+			}
+
+			//Forward until front sensor < 30
+			int getDistance = pingF();
+			while (getDistance >= 30)
+			{
+				forward();
+				getDistance = pingF();
+			}
+
+			//Turn right so that close wall is on the left.
+			yawNow = yaw;
+			while (yaw >= yawNow - 89)
+			{
+				right();
+			}
+
+			//Turn off motor.
+			analogWrite(leftB, 0);
+
+			break;
+
+		//Right
+		case 4:
+			//Turn right so that close wall is infront.
+			yawNow = yaw;
+			while (yaw >= yawNow - 89)
+			{
+				right();
+			}
+
+			//Forward until front sensor < 30
+			int getDistance = pingF();
+			while (getDistance >= 30)
+			{
+				forward();
+				getDistance = pingF();
+			}
+
+			//Turn right so that close wall is on the left.
+			yawNow = yaw;
+			while (yaw >= yawNow - 89)
+			{
+				right();
+			}
+
+			//Turn off motor.
+			analogWrite(rightB, 0);
+
+			break;
+		}
+	}
+}
 
 //Functions for movement of the robot
 void forward()
@@ -539,15 +525,11 @@ void forward()
   analogWrite(leftB,  0);
   analogWrite(rightB, 0);
   
+  //Different values to conteract the imbalance in the motors. These can be changed, higher = faster.
   analogWrite(leftF,  125);
   analogWrite(rightF, 117);
 
   RPS();
-
-  //analogWrite(leftF,  0);
-  //analogWrite(rightF, 0);
-  
-  Serial.println("Forward");
 }
 
 void right()
@@ -605,6 +587,4 @@ void backward()
   analogWrite(rightB, 117);
 
   RPS();
-  
-  Serial.println("Backward");
 }
