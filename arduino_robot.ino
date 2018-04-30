@@ -365,7 +365,7 @@ void aligned()
 	{
 		if(distL < lowest)
 		{
-		lowest = distL;
+			lowest = distL;
 		}
 		right();
   	}
@@ -549,11 +549,11 @@ void right()
 
 	if(millis() - currenttime > 9)
 	{
-	delay((increasetime*2000) - (millis() - currenttime));
+		delay((increasetime*2000) - (millis() - currenttime));
 	}
 	else
 	{
-	delay((increasetime*1000) - (millis() - currenttime));
+		delay((increasetime*1000) - (millis() - currenttime));
 	}
 }
 
@@ -572,11 +572,11 @@ void left()
 
 	if(millis() - currenttime > 9)
 	{
-	delay((increasetime*2000) - (millis() - currenttime));
+		delay((increasetime*2000) - (millis() - currenttime));
 	}
 	else
 	{
-	delay((increasetime*1000) - (millis() - currenttime));
+		delay((increasetime*1000) - (millis() - currenttime));
 	}
 }
 
