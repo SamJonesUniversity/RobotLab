@@ -39,7 +39,6 @@ bool stopped = false;
 float rotationsLps;
 float rotationsRps;
 int meanDist;
-bool turning = false;
 
 //Function for working out rotations per second.
 int counted = 0;
