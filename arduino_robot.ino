@@ -462,7 +462,7 @@ int whatWay()
 
 		//Left
 		case 3:
-			//Turn left so that close wall is infront.
+			//Turn left so that close wall is in front.
 			yawNow = yaw;
 			while (yaw >= yawNow + 89)
 			{
@@ -491,7 +491,7 @@ int whatWay()
 
 		//Right
 		case 4:
-			//Turn right so that close wall is infront.
+			//Turn right so that close wall is in front.
 			yawNow = yaw;
 			while (yaw >= yawNow - 89)
 			{
